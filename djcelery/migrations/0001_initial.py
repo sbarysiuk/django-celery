@@ -100,7 +100,6 @@ class Migration(SchemaMigration):
                 ('result', self.gf('django.db.models.fields.TextField')(null=True)),
                 ('traceback', self.gf('django.db.models.fields.TextField')(null=True)),
                 ('runtime', self.gf('django.db.models.fields.FloatField')(null=True)),
-                ('retries', self.gf('django.db.models.fields.IntegerField')(default=0)),
                 ('worker', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['djcelery.WorkerState'], null=True)),
                 ('hidden', self.gf('django.db.models.fields.BooleanField')(default=False, db_index=True)),)):
             db.send_create_signal('djcelery', ['TaskState'])
@@ -196,7 +195,6 @@ class Migration(SchemaMigration):
             'kwargs': ('django.db.models.fields.TextField', [], {'null': 'True'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '200', 'null': 'True', 'db_index': 'True'}),
             'result': ('django.db.models.fields.TextField', [], {'null': 'True'}),
-            'retries': ('django.db.models.fields.IntegerField', [], {'default': '0'}),
             'runtime': ('django.db.models.fields.FloatField', [], {'null': 'True'}),
             'state': ('django.db.models.fields.CharField', [], {'max_length': '64', 'db_index': 'True'}),
             'task_id': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '36'}),
