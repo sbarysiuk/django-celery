@@ -8,18 +8,6 @@ from django.db import models
 from django.db import DatabaseError
 
 
-<<<<<<< HEAD
-def ignore_exists(fun, *args, **kwargs):
-    try:
-        fun(*args, **kwargs)
-    except DatabaseError, exc:
-        if "exists" in str(exc):
-            return False
-        raise
-    return True
-
-=======
->>>>>>> c565202a022f8ea3063aba8a3285254ef3858b4b
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
