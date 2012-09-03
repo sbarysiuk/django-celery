@@ -6,10 +6,12 @@ import os
 # If your extensions are in another directory, add it here. If the directory
 # is relative to the documentation root, use os.path.abspath to make it
 # absolute, like shown here.
-sys.path.append(os.path.join(os.pardir, "tests"))
-from django.core.management import setup_environ
-import settings
-setup_environ(settings)
+sys.path.insert(0, os.getcwd())
+import django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+if django.VERSION < (1, 4):
+    from django.core.management import setup_environ
+    setup_environ(__import__(os.environ["DJANGO_SETTINGS_MODULE"]))
 import djcelery
 
 # General configuration
@@ -75,9 +77,6 @@ html_sidebars = {
 }
 
 ### Issuetracker
-
-# this is not working for some reason...
-if False:
-    issuetracker = "github"
-    issuetracker_project = "ask/django-celery"
-    issuetracker_issue_pattern = r'[Ii]ssue #(\d+)'
+issuetracker = "github"
+issuetracker_project = "ask/django-celery"
+issuetracker_issue_pattern = r'[Ii]ssue #(\d+)'

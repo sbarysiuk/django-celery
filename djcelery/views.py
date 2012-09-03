@@ -32,9 +32,9 @@ def task_view(task):
 
     def _applier(request, **options):
         kwargs = kwdict(request.method == "POST" and \
-                        request.POST.copy() or request.GET.copy())
-        kwargs.update(options)
-
+                        request.POST or request.GET)
+        # no multivalue
+        kwargs = dict(((k, v) for k, v in kwargs.iteritems()), **options)
         result = task.apply_async(kwargs=kwargs)
         return JsonResponse({"ok": "true", "task_id": result.task_id})
 

@@ -4,7 +4,6 @@ import warnings
 
 from functools import wraps
 from itertools import count
-from datetime import datetime
 
 from django.db import transaction, connection
 try:
@@ -17,6 +16,8 @@ from django.db.models.query import QuerySet
 from django.conf import settings
 
 from celery.utils.timeutils import maybe_timedelta
+
+from .utils import now
 
 
 class TxIsolationWarning(UserWarning):
@@ -102,11 +103,15 @@ class ResultManager(ExtendedManager):
 
     def get_all_expired(self, expires):
         """Get all expired task results."""
-        return self.filter(date_done__lt=datetime.now() - expires)
+        return self.filter(date_done__lt=now() - maybe_timedelta(expires))
 
     def delete_expired(self, expires):
         """Delete all expired taskset results."""
-        self.get_all_expired(expires).delete()
+        self.get_all_expired(expires).update(hidden=True)
+        cursor = self.connection_for_write().cursor()
+        cursor.execute("DELETE FROM %s WHERE hidden=%%s" % (
+                        self.model._meta.db_table, ), (True, ))
+        transaction.commit_unless_managed()
 
 
 class PeriodicTaskManager(ExtendedManager):
@@ -210,7 +215,7 @@ class TaskStateManager(ExtendedManager):
     def active(self):
         return self.filter(hidden=False)
 
-    def expired(self, states, expires, nowfun=datetime.now):
+    def expired(self, states, expires, nowfun=now):
         return self.filter(state__in=states,
                            tstamp__lte=nowfun() - maybe_timedelta(expires))
 

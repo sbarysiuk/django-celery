@@ -11,6 +11,7 @@ from djcelery import schedulers
 from djcelery.app import app
 from djcelery.models import PeriodicTask, IntervalSchedule, CrontabSchedule
 from djcelery.models import PeriodicTasks
+from djcelery.utils import now
 from djcelery.tests.utils import unittest
 
 
@@ -85,12 +86,12 @@ class test_ModelEntry(unittest.TestCase):
                                        "exchange": "foo",
                                        "routing_key": "cpu"}, e.options)
 
-        now = datetime.now()
+        right_now = now()
         m2 = create_model_interval(schedule(timedelta(seconds=10)),
-                                   last_run_at=now)
+                                   last_run_at=right_now)
         self.assertTrue(m2.last_run_at)
         e2 = self.Entry(m2)
-        self.assertIs(e2.last_run_at, now)
+        self.assertIs(e2.last_run_at, right_now)
 
         e3 = e2.next()
         self.assertGreater(e3.last_run_at, e2.last_run_at)
@@ -106,7 +107,7 @@ class test_DatabaseScheduler(unittest.TestCase):
         app.conf.CELERYBEAT_SCHEDULE = {}
         m1 = create_model_interval(schedule(timedelta(seconds=10)))
         m2 = create_model_interval(schedule(timedelta(minutes=20)))
-        m3 = create_model_crontab(crontab(minute="2,4,5"))
+        m3 = create_model_crontab(crontab(minute="2,4,5", nowfun=now))
         for obj in m1, m2, m3:
             obj.save()
         self.s = self.Scheduler()
@@ -236,7 +237,8 @@ class test_models(unittest.TestCase):
                         "%s: every 10.0 seconds" % p.name)
 
     def test_PeriodicTask_unicode_crontab(self):
-        p = create_model_crontab(crontab(hour="4, 5", day_of_week="4, 5"))
+        p = create_model_crontab(crontab(hour="4, 5", day_of_week="4, 5",
+                                 nowfun=now))
         self.assertEqual(unicode(p),
                         "%s: * 4,5 4,5 (m/h/d)" % p.name)
 
@@ -245,7 +247,8 @@ class test_models(unittest.TestCase):
         s1 = p1.schedule
         self.assertEqual(timedelta_seconds(s1.run_every), 10)
 
-        p2 = create_model_crontab(crontab(hour="4, 5", minute="10,20,30"))
+        p2 = create_model_crontab(crontab(hour="4, 5", minute="10,20,30",
+                                          nowfun=now))
         s2 = p2.schedule
         self.assertSetEqual(s2.hour, set([4, 5]))
         self.assertSetEqual(s2.minute, set([10, 20, 30]))

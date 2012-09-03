@@ -1,23 +1,23 @@
 from __future__ import absolute_import
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from time import time, mktime
 
 import django
 
 from django.conf import settings
-from django.core.exceptions import MultipleObjectsReturned
+from django.core.exceptions import MultipleObjectsReturned, ValidationError
 from django.db import models
 from django.db.models import signals
 from django.utils.translation import ugettext_lazy as _
-
-from picklefield.fields import PickledObjectField
 
 from celery import schedules
 from celery import states
 from celery.utils.timeutils import timedelta_seconds
 
 from . import managers
+from .picklefield import PickledObjectField
+from .utils import now
 
 HEARTBEAT_EXPIRE = 150      # 2 minutes, 30 seconds
 TASK_STATE_CHOICES = zip(states.ALL_STATES, states.ALL_STATES)
@@ -31,6 +31,7 @@ class TaskMeta(models.Model):
     result = PickledObjectField(null=True, default=None)
     date_done = models.DateTimeField(_(u"done at"), auto_now=True)
     traceback = models.TextField(_(u"traceback"), blank=True, null=True)
+    hidden = models.BooleanField(editable=False, default=False, db_index=True)
 
     objects = managers.TaskManager()
 
@@ -56,6 +57,7 @@ class TaskSetMeta(models.Model):
     taskset_id = models.CharField(_(u"task id"), max_length=255, unique=True)
     result = PickledObjectField()
     date_done = models.DateTimeField(_(u"done at"), auto_now=True)
+    hidden = models.BooleanField(editable=False, default=False, db_index=True)
 
     objects = managers.TaskSetManager()
 
@@ -137,7 +139,8 @@ class CrontabSchedule(models.Model):
     def schedule(self):
         return schedules.crontab(minute=self.minute,
                                 hour=self.hour,
-                                day_of_week=self.day_of_week)
+                                day_of_week=self.day_of_week,
+                                nowfun=now)
 
     @classmethod
     def from_schedule(cls, schedule):
@@ -155,9 +158,8 @@ class PeriodicTasks(models.Model):
     @classmethod
     def changed(cls, instance, **kwargs):
         if not instance.no_changes:
-            now = datetime.now()
             cls.objects.update_or_create(ident=1,
-                                         defaults={"last_update": now})
+                                         defaults={"last_update": now()})
 
     @classmethod
     def last_change(cls):
@@ -200,6 +202,7 @@ class PeriodicTask(models.Model):
                               editable=False, blank=True, null=True)
     total_run_count = models.PositiveIntegerField(default=0, editable=False)
     date_changed = models.DateTimeField(auto_now=True)
+    description = models.TextField(_("description"), blank=True)
 
     objects = managers.PeriodicTaskManager()
     no_changes = False
@@ -208,10 +211,21 @@ class PeriodicTask(models.Model):
         verbose_name = _(u"periodic task")
         verbose_name_plural = _(u"periodic tasks")
 
+    def validate_unique(self, *args, **kwargs):
+        super(PeriodicTask, self).validate_unique(*args, **kwargs)
+        if not self.interval and not self.crontab:
+            raise ValidationError(
+                {"interval": ["One of interval or crontab must be set."]})
+        if self.interval and self.crontab:
+            raise ValidationError(
+                {"crontab": ["Only one of interval or crontab must be set"]})
+
     def save(self, *args, **kwargs):
         self.exchange = self.exchange or None
         self.routing_key = self.routing_key or None
         self.queue = self.queue or None
+        if not self.enabled:
+            self.last_run_at = None
         super(PeriodicTask, self).save(*args, **kwargs)
 
     def __unicode__(self):
